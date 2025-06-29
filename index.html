@@ -1,21 +1,149 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-  <meta charset="UTF-8" />
-  <title>BabbelBabbel – Ron & Ruben</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <title>Babbel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: sans-serif; background: #f9f9f9; margin: 0; padding: 20px; }
+    #chatbox { border: 1px solid #ccc; padding: 10px; height: 60vh; overflow-y: scroll; background: #fff; border-radius: 8px; }
+    .message { margin: 10px 0; padding: 8px 12px; border-radius: 10px; display: flex; align-items: center; max-width: 90%; }
+    .bubble { width: 14px; height: 14px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; }
+    #inputArea { margin-top: 15px; display: flex; gap: 10px; }
+    select, input, button { padding: 8px; font-size: 1em; }
+    #header { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; align-items: center; }
+    #warning { color: red; font-weight: bold; display: none; }
+    #adminControls { margin-top: 10px; display: none; }
+    @media (max-width: 600px) {
+      #chatbox { height: 50vh; }
+    }
+  </style>
+  <script src="config.js"></script>
 </head>
 <body>
-  <h2>BabbelBabbel</h2>
-  <div id="inputArea">
-    <input type="text" id="nameInput" placeholder="Jouw naam..." />
+  <div id="header">
+    <label>Project:
+      <select id="projectSelect">
+        <option value="project1">Project 1</option>
+        <option value="project2">Project 2</option>
+        <option value="project3">Project 3</option>
+      </select>
+    </label>
+    <label>Naam:
+      <input type="text" id="nameInput" placeholder="Jouw naam...">
+    </label>
     <button onclick="confirmName()">Bevestig naam</button>
   </div>
+
+  <h2>ChatGPT Babbelinterface</h2>
+  <div id="warning"></div>
   <div id="chatbox"></div>
-  <div id="sendArea">
-    <input type="text" id="userInput" placeholder="Typ een bericht..." />
+
+  <div id="inputArea">
+    <input type="text" id="userInput" placeholder="Typ een bericht..." style="flex:1">
     <button onclick="sendMessage()">Stuur</button>
   </div>
-  <script src="script.js"></script>
+
+  <div id="adminControls">
+    <button onclick="clearName()">❌ Verwijder huidige gebruiker</button>
+  </div>
+
+  <script>
+    const chatbox = document.getElementById('chatbox');
+    const inputField = document.getElementById('userInput');
+    const nameInput = document.getElementById('nameInput');
+    const projectSelect = document.getElementById('projectSelect');
+    const warning = document.getElementById('warning');
+    const adminControls = document.getElementById('adminControls');
+
+    const userColors = {};
+    const colorList = ['green', 'blue', 'orange', 'purple', 'teal', 'brown', 'red', 'pink', 'gray', 'navy'];
+    let confirmedName = localStorage.getItem('confirmedName');
+
+    if (confirmedName) {
+      nameInput.value = confirmedName;
+      nameInput.disabled = true;
+      adminControls.style.display = 'block';
+    }
+
+    inputField.addEventListener('keydown', function(event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        sendMessage();
+      }
+    });
+
+    function getUserColor(name) {
+      if (!userColors[name]) {
+        const assigned = colorList[Object.keys(userColors).length % colorList.length];
+        userColors[name] = assigned;
+      }
+      return userColors[name];
+    }
+
+    function confirmName() {
+      const name = nameInput.value.trim();
+      if (!name) return;
+
+      if (confirmedName) {
+        warning.textContent = 'Je naam is al bevestigd als: ' + confirmedName;
+        warning.style.display = 'block';
+        return;
+      }
+
+      confirmedName = name;
+      nameInput.disabled = true;
+      localStorage.setItem('confirmedName', confirmedName);
+      warning.style.display = 'none';
+      adminControls.style.display = 'block';
+    }
+
+    function sendMessage() {
+      const text = inputField.value.trim();
+      const project = projectSelect.value;
+      if (!confirmedName || !text) return;
+
+      const userColor = getUserColor(confirmedName);
+      addMessage(confirmedName, text, userColor);
+      inputField.value = '';
+
+      fetch(BACKEND_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project: project,
+          user: confirmedName,
+          message: text
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        addMessage('ChatGPT (' + confirmedName + ')', data.reply, '#ccc');
+      })
+      .catch(err => {
+        console.error(err);
+        addMessage('Fout', 'Er ging iets mis bij de backend.', 'red');
+      });
+    }
+
+    function addMessage(sender, text, color) {
+      const msg = document.createElement('div');
+      msg.className = 'message';
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.style.backgroundColor = color;
+      const content = document.createElement('span');
+      content.textContent = sender + ': ' + text;
+      msg.appendChild(bubble);
+      msg.appendChild(content);
+      chatbox.appendChild(msg);
+      chatbox.scrollTop = chatbox.scrollHeight;
+    }
+
+    function clearName() {
+      localStorage.removeItem('confirmedName');
+      location.reload();
+    }
+  </script>
 </body>
 </html>

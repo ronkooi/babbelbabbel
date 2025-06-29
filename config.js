@@ -1,0 +1,1 @@
+const BACKEND_URL = 'https://jouw-backend-url.example.com/api/chat';
